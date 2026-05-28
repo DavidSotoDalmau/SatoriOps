@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ORGANIZER
+  CONTRIBUTOR
+  VIEWER
+}
+
+enum Status {
+  IDEA
+  PLANNED
+  ACTIVE
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id                 String        @id @default(cuid())
+  name               String?
+  email              String        @unique
+  passwordHash       String?
+  mustChangePassword Boolean       @default(false)
+  emailVerified      DateTime?
+  image              String?
+  accounts           Account[]
+  sessions           Session[]
+  memberships        Membership[]
+  invitationsCreated Invitation[]  @relation("InvitationsCreated")
+  invitationsUsed    Invitation[]  @relation("InvitationsAccepted")
+  auditLogs          AuditLog[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Organization {
+  id            String       @id @default(cuid())
+  name          String
+  slug          String       @unique
+  description   String?
+  memberships   Membership[]
+  invitations   Invitation[]
+  events        Event[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Membership {
+  id                 String         @id @default(cuid())
+  userId             String
+  organizationId     String
+  role               Role
+  active             Boolean        @default(true)
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownedTopics        Topic[]        @relation("TopicOwner")
+  ownedTasks         Task[]         @relation("TaskOwner")
+  authoredComments   Comment[]
+  authoredDecisions  Decision[]
+  createdEvents      Event[]
+  createdTopics      Topic[]        @relation("TopicCreator")
+  createdTasks       Task[]         @relation("TaskCreator")
+  createdInvitations Invitation[]   @relation("MembershipInviter")
+  auditLogs          AuditLog[]     @relation("MembershipAuditActor")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([userId, organizationId])
+}
+
+model Invitation {
+  id               String       @id @default(cuid())
+  organizationId   String
+  email            String
+  role             Role
+  tokenHash        String       @unique
+  initialPasswordHash String?
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+  invitedByUserId  String
+  invitedByMemberId String
+  acceptedByUserId String?
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedByUser    User         @relation("InvitationsCreated", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  invitedByMember  Membership   @relation("MembershipInviter", fields: [invitedByMemberId], references: [id], onDelete: Cascade)
+  acceptedByUser   User?        @relation("InvitationsAccepted", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([organizationId, email])
+}
+
+model Event {
+  id               String       @id @default(cuid())
+  organizationId   String
+  createdById      String
+  name             String
+  slug             String
+  description      String?
+  location         String?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  status           Status       @default(IDEA)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        Membership   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  topics           Topic[]
+  decisions        Decision[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
+}
+
+model Topic {
+  id               String         @id @default(cuid())
+  eventId          String
+  ownerId          String?
+  createdById      String
+  title            String
+  area             String
+  status           Status         @default(IDEA)
+  priority         Priority       @default(MEDIUM)
+  dueDate          DateTime?
+  description      String?
+  event            Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  owner            Membership?    @relation("TopicOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy        Membership     @relation("TopicCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  tasks            Task[]
+  comments         Comment[]
+  decisions        Decision[]
+  dependenciesFrom Dependency[]   @relation("BlockedTopic")
+  dependenciesTo   Dependency[]   @relation("BlockingTopic")
+  auditLogs        AuditLog[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Task {
+  id               String       @id @default(cuid())
+  topicId          String
+  ownerId          String?
+  createdById      String
+  title            String
+  status           Status       @default(IDEA)
+  priority         Priority     @default(MEDIUM)
+  dueDate          DateTime?
+  description      String?
+  topic            Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  owner            Membership?  @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy        Membership   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  comments         Comment[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Comment {
+  id               String      @id @default(cuid())
+  topicId          String
+  taskId           String?
+  authorId         String
+  body             String
+  topic            Topic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  task             Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author           Membership  @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Decision {
+  id               String      @id @default(cuid())
+  eventId          String
+  topicId          String?
+  createdById      String
+  title            String
+  summary          String
+  status           Status      @default(IDEA)
+  decidedAt        DateTime?
+  event            Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  topic            Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  createdBy        Membership  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  auditLogs        AuditLog[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Dependency {
+  id               String   @id @default(cuid())
+  blockedTopicId   String
+  blockingTopicId  String
+  note             String?
+  blockedTopic     Topic    @relation("BlockedTopic", fields: [blockedTopicId], references: [id], onDelete: Cascade)
+  blockingTopic    Topic    @relation("BlockingTopic", fields: [blockingTopicId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+
+  @@unique([blockedTopicId, blockingTopicId])
+}
+
+model AuditLog {
+  id               String        @id @default(cuid())
+  organizationId   String
+  actorUserId      String?
+  actorMembershipId String?
+  eventId          String?
+  topicId          String?
+  taskId           String?
+  decisionId       String?
+  action           String
+  entityType       String
+  entityId         String
+  isSensitive      Boolean       @default(false)
+  metadata         String?
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUser        User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorMembership  Membership?   @relation("MembershipAuditActor", fields: [actorMembershipId], references: [id], onDelete: SetNull)
+  event            Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  topic            Topic?        @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  task             Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  decision         Decision?     @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+  createdAt        DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([action, createdAt])
+}
