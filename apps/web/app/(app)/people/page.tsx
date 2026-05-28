@@ -19,6 +19,11 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const membership = await requireMembership();
   const params = await searchParams;
   const { locale, t } = await getTranslations();
+
+  if (membership.role !== "OWNER") {
+    return <Badge variant="danger">{t.pages.people.denied}</Badge>;
+  }
+
   const members = await db.membership.findMany({
     where: { organizationId: membership.organizationId, active: true },
     include: { user: true },

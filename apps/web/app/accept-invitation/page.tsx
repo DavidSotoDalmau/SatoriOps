@@ -52,6 +52,17 @@ export default async function AcceptInvitationPage({ searchParams }: AcceptInvit
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">{t.auth.currentPassword}</Label>
+              <Input
+                id="currentPassword"
+                name="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                minLength={12}
+              />
+              <p className="text-xs text-slate-400">{t.auth.existingAccountHelp}</p>
+            </div>
             <Button className="w-full" type="submit">
               {t.auth.createAccount}
             </Button>

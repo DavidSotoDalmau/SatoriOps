@@ -159,6 +159,7 @@ export const dictionaries = {
       confirmPassword: "Confirm password",
       updatePassword: "Update password",
       temporaryPasswordHelp: "Your organizer or owner will share the temporary password separately. You will be asked to change it after the first sign-in.",
+      existingAccountHelp: "If this email already has an account, enter its current password to attach the invitation securely.",
     },
     pages: {
       dashboard: {
@@ -220,6 +221,7 @@ export const dictionaries = {
         title: "Members and owners",
         updateRole: "Update role",
         deactivateMember: "Deactivate member",
+        denied: "Only owners can view and manage organization members.",
       },
       invitations: {
         eyebrow: "Invitations",
@@ -229,6 +231,7 @@ export const dictionaries = {
         generateInvitation: "Generate invitation",
         temporaryPassword: "Temporary password",
         regenerateTemporaryPassword: "Regenerate temporary password",
+        denied: "You do not have permission to view invitations.",
         accepted: "Accepted",
         revoked: "Revoked",
         pending: "Pending",
@@ -419,6 +422,7 @@ export const dictionaries = {
       confirmPassword: "Confirmar contrasena",
       updatePassword: "Actualizar contrasena",
       temporaryPasswordHelp: "Tu organizador u owner te compartira la contrasena temporal por separado. Tendras que cambiarla despues del primer acceso.",
+      existingAccountHelp: "Si este correo ya tiene cuenta, introduce su contrasena actual para asociar la invitacion de forma segura.",
     },
     pages: {
       dashboard: {
@@ -480,6 +484,7 @@ export const dictionaries = {
         title: "Miembros y owners",
         updateRole: "Actualizar rol",
         deactivateMember: "Dar de baja",
+        denied: "Solo los owners pueden ver y gestionar a los miembros de la organizacion.",
       },
       invitations: {
         eyebrow: "Invitaciones",
@@ -489,6 +494,7 @@ export const dictionaries = {
         generateInvitation: "Generar invitacion",
         temporaryPassword: "Contrasena temporal",
         regenerateTemporaryPassword: "Regenerar contrasena temporal",
+        denied: "No tienes permiso para ver invitaciones.",
         accepted: "Aceptada",
         revoked: "Revocada",
         pending: "Pendiente",
@@ -679,6 +685,7 @@ export const dictionaries = {
       confirmPassword: "Confirmar contrasenya",
       updatePassword: "Actualitzar contrasenya",
       temporaryPasswordHelp: "El teu organizer o owner et compartira la contrasenya temporal per separat. L'hauras de canviar despres del primer accés.",
+      existingAccountHelp: "Si aquest correu ja te compte, introdueix la contrasenya actual per associar la invitacio de forma segura.",
     },
     pages: {
       dashboard: {
@@ -740,6 +747,7 @@ export const dictionaries = {
         title: "Membres i owners",
         updateRole: "Actualitzar rol",
         deactivateMember: "Donar de baixa",
+        denied: "Nomes els owners poden veure i gestionar els membres de l'organitzacio.",
       },
       invitations: {
         eyebrow: "Invitacions",
@@ -749,6 +757,7 @@ export const dictionaries = {
         generateInvitation: "Generar invitacio",
         temporaryPassword: "Contrasenya temporal",
         regenerateTemporaryPassword: "Regenerar contrasenya temporal",
+        denied: "No tens permis per veure invitacions.",
         accepted: "Acceptada",
         revoked: "Revocada",
         pending: "Pendent",

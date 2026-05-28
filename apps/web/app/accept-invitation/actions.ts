@@ -1,5 +1,6 @@
 "use server";
 
+import { compare } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { createAuditLog } from "@/lib/audit";
 import { db } from "@/lib/db";
@@ -12,6 +13,7 @@ export async function acceptInvitation(formData: FormData) {
     token: formData.get("token"),
     name: formData.get("name"),
     email: formData.get("email"),
+    currentPassword: formData.get("currentPassword"),
   });
 
   if (!parsed.success) {
@@ -51,18 +53,27 @@ export async function acceptInvitation(formData: FormData) {
         throw new AppError("This user already belongs to the organization.");
       }
 
-      if (!invitation.initialPasswordHash) {
-        throw new AppError("This invitation is missing its initial password. Create a new invitation.");
+      if (!user.passwordHash) {
+        throw new AppError("This account already exists. Sign in with its current provider before accepting the invitation.");
       }
 
-      user = await db.user.update({
-        where: { id: user.id },
-        data: {
-          name: user.name || parsed.data.name.trim(),
-          passwordHash: invitation.initialPasswordHash,
-          mustChangePassword: true,
-        },
-      });
+      if (!parsed.data.currentPassword) {
+        throw new AppError("Existing accounts must confirm their current password to accept the invitation.");
+      }
+
+      const passwordMatches = await compare(parsed.data.currentPassword, user.passwordHash);
+      if (!passwordMatches) {
+        throw new AppError("The current password is not valid.");
+      }
+
+      if (!user.name && parsed.data.name.trim()) {
+        user = await db.user.update({
+          where: { id: user.id },
+          data: {
+            name: parsed.data.name.trim(),
+          },
+        });
+      }
     } else {
       if (!invitation.initialPasswordHash) {
         throw new AppError("This invitation is missing its initial password. Create a new invitation.");

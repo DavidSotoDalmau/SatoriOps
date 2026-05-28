@@ -2,6 +2,7 @@
 
 import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { Role, Status } from "@prisma/client";
@@ -23,14 +24,18 @@ import { invitationSchema } from "@/lib/validators/auth";
 import {
   commentSchema,
   decisionSchema,
+  decisionDeletionSchema,
   decisionUpdateSchema,
   eventSchema,
+  eventStatusUpdateSchema,
   membershipRoleSchema,
   membershipDeactivationSchema,
   settingsSchema,
   taskSchema,
+  taskDeletionSchema,
   taskUpdateSchema,
   topicKanbanMoveSchema,
+  topicDeletionSchema,
   topicSchema,
   topicUpdateSchema,
 } from "@/lib/validators/domain";
@@ -60,6 +65,23 @@ function slugify(input: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
+}
+
+const invitationShareCookieName = "satoriops-invitation-share";
+
+async function setInvitationShareCookie(input: {
+  email: string;
+  temporaryPassword: string;
+  token?: string;
+}) {
+  const cookieStore = await cookies();
+  cookieStore.set(invitationShareCookieName, JSON.stringify(input), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/invitations",
+    maxAge: 60 * 5,
+  });
 }
 
 export async function createInvitation(formData: FormData) {
@@ -129,10 +151,14 @@ export async function createInvitation(formData: FormData) {
       },
     });
 
+    await setInvitationShareCookie({
+      email,
+      temporaryPassword,
+      token: rawToken,
+    });
+
     revalidatePath("/invitations");
-    redirect(
-      `${returnTo}?created=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(temporaryPassword)}`,
-    );
+    redirect(returnTo);
   } catch (error) {
     fail(returnTo, error);
   }
@@ -195,10 +221,13 @@ export async function regenerateInvitationPassword(formData: FormData) {
       },
     });
 
+    await setInvitationShareCookie({
+      email: invitation.email,
+      temporaryPassword,
+    });
+
     revalidatePath("/invitations");
-    redirect(
-      `${returnTo}?email=${encodeURIComponent(invitation.email)}&password=${encodeURIComponent(temporaryPassword)}&passwordOnly=1`,
-    );
+    redirect(returnTo);
   } catch (error) {
     fail(returnTo, error);
   }
@@ -256,9 +285,16 @@ export async function createEvent(formData: FormData) {
 
 export async function updateEventStatus(formData: FormData) {
   const membership = await requireMembership();
-  const eventId = String(formData.get("eventId") ?? "");
-  const status = String(formData.get("status") ?? "");
+  const parsed = eventStatusUpdateSchema.safeParse({
+    eventId: formData.get("eventId"),
+    status: formData.get("status"),
+    returnTo: formData.get("returnTo"),
+  });
   const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/dashboard"), "/dashboard");
+
+  if (!parsed.success) {
+    fail(returnTo, new AppError("Invalid event status payload."));
+  }
 
   try {
     if (!canManageEvent(membership.role)) {
@@ -266,7 +302,7 @@ export async function updateEventStatus(formData: FormData) {
     }
 
     const event = await db.event.findFirst({
-      where: { id: eventId, organizationId: membership.organizationId },
+      where: { id: parsed.data.eventId, organizationId: membership.organizationId },
     });
 
     if (!event) {
@@ -275,7 +311,7 @@ export async function updateEventStatus(formData: FormData) {
 
     await db.event.update({
       where: { id: event.id },
-      data: { status: status as Status },
+      data: { status: parsed.data.status },
     });
 
     await createAuditLog({
@@ -286,7 +322,7 @@ export async function updateEventStatus(formData: FormData) {
       entityType: "Event",
       entityId: event.id,
       eventId: event.id,
-      metadata: { status },
+      metadata: { status: parsed.data.status },
     });
 
     revalidatePath(returnTo);
@@ -422,8 +458,15 @@ export async function updateTopic(formData: FormData) {
 
 export async function deleteTopic(formData: FormData) {
   const membership = await requireMembership();
-  const topicId = String(formData.get("topicId") ?? "");
+  const parsed = topicDeletionSchema.safeParse({
+    topicId: formData.get("topicId"),
+    returnTo: formData.get("returnTo"),
+  });
   const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/topics"), "/topics");
+
+  if (!parsed.success) {
+    fail(returnTo, new AppError("Invalid topic deletion payload."));
+  }
 
   try {
     if (!canDeleteTopic(membership.role)) {
@@ -432,7 +475,7 @@ export async function deleteTopic(formData: FormData) {
 
     const topic = await db.topic.findFirst({
       where: {
-        id: topicId,
+        id: parsed.data.topicId,
         event: { organizationId: membership.organizationId },
       },
     });
@@ -657,13 +700,20 @@ export async function updateTask(formData: FormData) {
 
 export async function deleteTask(formData: FormData) {
   const membership = await requireMembership();
-  const taskId = String(formData.get("taskId") ?? "");
+  const parsed = taskDeletionSchema.safeParse({
+    taskId: formData.get("taskId"),
+    returnTo: formData.get("returnTo"),
+  });
   const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/topics"), "/topics");
+
+  if (!parsed.success) {
+    fail(returnTo, new AppError("Invalid task deletion payload."));
+  }
 
   try {
     const task = await db.task.findFirst({
       where: {
-        id: taskId,
+        id: parsed.data.taskId,
         topic: {
           event: { organizationId: membership.organizationId },
         },
@@ -833,13 +883,20 @@ export async function updateDecision(formData: FormData) {
 
 export async function deleteDecision(formData: FormData) {
   const membership = await requireMembership();
-  const decisionId = String(formData.get("decisionId") ?? "");
+  const parsed = decisionDeletionSchema.safeParse({
+    decisionId: formData.get("decisionId"),
+    returnTo: formData.get("returnTo"),
+  });
   const returnTo = safeReturnTo(String(formData.get("returnTo") ?? "/decisions"), "/decisions");
+
+  if (!parsed.success) {
+    fail(returnTo, new AppError("Invalid decision deletion payload."));
+  }
 
   try {
     const decision = await db.decision.findFirst({
       where: {
-        id: decisionId,
+        id: parsed.data.decisionId,
         event: { organizationId: membership.organizationId },
       },
     });

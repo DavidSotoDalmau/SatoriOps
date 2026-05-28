@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createInvitation, regenerateInvitationPassword } from "@/app/(app)/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
   const membership = await requireMembership();
   const params = await searchParams;
   const { locale, t } = await getTranslations();
+
+  if (membership.role !== "OWNER" && membership.role !== "ORGANIZER") {
+    return <Badge variant="danger">{t.pages.invitations.denied}</Badge>;
+  }
+
   const invitations = await db.invitation.findMany({
     where: {
       organizationId: membership.organizationId,
@@ -35,11 +41,23 @@ export default async function InvitationsPage({ searchParams }: InvitationsPageP
 
   const allowedRoles: readonly ("OWNER" | "ORGANIZER" | "CONTRIBUTOR" | "VIEWER")[] =
     membership.role === "OWNER" ? roles : ["CONTRIBUTOR", "VIEWER"];
+  const cookieStore = await cookies();
+  const shareCookie = cookieStore.get("satoriops-invitation-share")?.value;
+  let shareData: { email?: string; temporaryPassword?: string; token?: string } | null = null;
+
+  if (shareCookie) {
+    try {
+      shareData = JSON.parse(shareCookie) as { email?: string; temporaryPassword?: string; token?: string };
+    } catch {
+      shareData = null;
+    }
+  }
+
   const inviteUrl =
-    params.created && params.email && params.passwordOnly !== "1"
-      ? `${process.env.APP_URL ?? "http://localhost:3000"}/accept-invitation?token=${encodeURIComponent(params.created)}&email=${encodeURIComponent(params.email)}`
+    shareData?.token && shareData.email
+      ? `${process.env.APP_URL ?? "http://localhost:3000"}/accept-invitation?token=${encodeURIComponent(shareData.token)}&email=${encodeURIComponent(shareData.email)}`
       : null;
-  const initialPassword = params.password ?? null;
+  const initialPassword = shareData?.temporaryPassword ?? null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">

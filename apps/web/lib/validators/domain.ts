@@ -88,3 +88,24 @@ export const membershipDeactivationSchema = z.object({
   membershipId: z.string().cuid(),
   returnTo: z.string().default("/people"),
 });
+
+export const eventStatusUpdateSchema = z.object({
+  eventId: z.string().cuid(),
+  status: z.enum(["IDEA", "PLANNED", "ACTIVE", "BLOCKED", "DONE", "CANCELLED"]),
+  returnTo: z.string().default("/dashboard"),
+});
+
+export const topicDeletionSchema = z.object({
+  topicId: z.string().cuid(),
+  returnTo: z.string().default("/topics"),
+});
+
+export const taskDeletionSchema = z.object({
+  taskId: z.string().cuid(),
+  returnTo: z.string().default("/topics"),
+});
+
+export const decisionDeletionSchema = z.object({
+  decisionId: z.string().cuid(),
+  returnTo: z.string().default("/decisions"),
+});
